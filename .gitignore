@@ -1,0 +1,12 @@
+.upstream/
+node_modules/
+dist/
+.serena/
+.DS_Store
+*.tgz
+.env
+.env.*
+*.log
+.dispatch.log
+.codereview.log
+.dispatch.log
