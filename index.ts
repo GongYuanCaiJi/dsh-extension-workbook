@@ -55,7 +55,9 @@ function withGuidelines(description: string): string {
 // session cwd via `ctx.cwd`. dsh passes `exec` instead; the community pattern
 // for the owning agent's cwd is `exec.agent.session.header.cwd`
 // (dsh-email, dsh-agent-loop).
-function cwdOf(exec: { agent?: { session?: { header?: { cwd?: string } } } } | undefined): string {
+type ToolExec = { agent?: { session?: { header?: { cwd?: string } } }; signal?: AbortSignal };
+
+function cwdOf(exec: ToolExec | undefined): string {
   return exec?.agent?.session?.header?.cwd ?? process.cwd();
 }
 
@@ -63,21 +65,32 @@ function cwdOf(exec: { agent?: { session?: { header?: { cwd?: string } } } } | u
 // equivalent (dsh tools are execute-then-render); the calls are dropped.
 
 // dsh's `output.render` is synchronous, while the upstream bounded renderer
-// (`boundedJsonResult`) may write a truncation artifact asynchronously.
-// `execute` therefore precomputes the upstream bounded text and carries it in
-// the canonical value under `renderText`; `render` emits it verbatim. The
-// full payload remains the value for downstream consumers.
+// (`boundedJsonResult`) may write a truncation artifact asynchronously, so
+// `execute` precomputes the bounded text and carries it in the value under
+// `renderText`; `render` emits it verbatim.
+function textRender(_args: unknown, value: Record<string, unknown>): Array<{ type: "text"; text: string }> {
+  return [{ type: "text", text: String(value.renderText) }];
+}
 async function withRenderText(
   payload: Record<string, unknown>,
   label: string,
   input: { limits?: Partial<import("./src/core/limits.ts").WorkbookLimits> },
 ): Promise<Record<string, unknown>> {
-  const { content } = await boundedJsonResult(payload, label, visibleLimitFrom(input));
-  return { ...payload, renderText: content[0]?.text ?? "" };
+  const json = toLosslessJson(payload);
+  const { content } = await boundedJsonResult(json, label, visibleLimitFrom(input));
+  return { ...json, renderText: content[0]?.text ?? "" };
 }
 
 function toJsonSchema(schema: unknown): Record<string, unknown> {
-  return JSON.parse(JSON.stringify(schema)) as Record<string, unknown>;
+  return toLosslessJson(schema) as Record<string, unknown>;
+}
+
+// The harness snapshots every canonical tool value and rejects members that
+// are not lossless JSON (the engine's style descriptors, for example, carry
+// explicit `undefined` attribute values). A JSON round-trip is the honest
+// normalization: it drops undefined members and coerces non-finite numbers.
+function toLosslessJson<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 function resultSchema(properties: Record<string, unknown>): Record<string, unknown> {
@@ -193,10 +206,10 @@ export function apply(ctx: {
     parameters: toJsonSchema(InspectSchema),
     output: {
       schema: inspectOutputSchema,
-      render: (_args: unknown, value: Record<string, unknown>) => [{ type: "text", text: value.renderText }],
+      render: textRender,
     },
     presentCall: () => ({ card: "generic", title: "Inspect Workbook", kind: "read" }),
-    async execute(args: WorkbookInspectRequest, exec: { agent?: { session?: { header?: { cwd?: string } } }; signal?: AbortSignal }) {
+    async execute(args: WorkbookInspectRequest, exec: ToolExec) {
       const result = await new OoxmlSafeEngine(cwdOf(exec)).inspect(args, exec.signal);
       return withRenderText(result as Record<string, unknown>, "workbook-inspect", args);
     },
@@ -210,10 +223,10 @@ export function apply(ctx: {
     parameters: toJsonSchema(ReadSchema),
     output: {
       schema: readOutputSchema,
-      render: (_args: unknown, value: Record<string, unknown>) => [{ type: "text", text: value.renderText }],
+      render: textRender,
     },
     presentCall: () => ({ card: "generic", title: "Read Workbook Range", kind: "read" }),
-    async execute(args: WorkbookReadRequest, exec: { agent?: { session?: { header?: { cwd?: string } } }; signal?: AbortSignal }) {
+    async execute(args: WorkbookReadRequest, exec: ToolExec) {
       const result = await new OoxmlSafeEngine(cwdOf(exec)).read(args, exec.signal);
       return withRenderText(result as Record<string, unknown>, "workbook-read", args);
     },
@@ -230,10 +243,10 @@ export function apply(ctx: {
       render: (_args: unknown, value: Record<string, unknown>) => [{ type: "text", text: renderTextForImage(value) }],
     },
     presentCall: () => ({ card: "generic", title: "Render Workbook Range", kind: "read" }),
-    async execute(args: WorkbookRenderRequest, exec: { agent?: { session?: { header?: { cwd?: string } } }; signal?: AbortSignal }) {
+    async execute(args: WorkbookRenderRequest, exec: ToolExec) {
       const result = (await new OoxmlSafeEngine(cwdOf(exec)).render(args, exec.signal)) as Record<string, unknown> & { png: Uint8Array };
       const { png, ...details } = result;
-      return details;
+      return toLosslessJson(details);
     },
   });
 
@@ -245,10 +258,10 @@ export function apply(ctx: {
     parameters: toJsonSchema(EditSchema),
     output: {
       schema: editOutputSchema,
-      render: (_args: unknown, value: Record<string, unknown>) => [{ type: "text", text: value.renderText }],
+      render: textRender,
     },
     presentCall: () => ({ card: "generic", title: "Edit Workbook", kind: "edit" }),
-    async execute(args: WorkbookEditRequest, exec: { agent?: { session?: { header?: { cwd?: string } } }; signal?: AbortSignal }) {
+    async execute(args: WorkbookEditRequest, exec: ToolExec) {
       const params = { ...args, schemaVersion: args.schemaVersion ?? WORKBOOK_CONTRACT_VERSION };
       const engine = new OoxmlSafeEngine(cwdOf(exec), withFileMutationQueue);
       const result = await engine.edit(params, exec.signal);
@@ -264,10 +277,10 @@ export function apply(ctx: {
     parameters: toJsonSchema(DiffSchema),
     output: {
       schema: diffOutputSchema,
-      render: (_args: unknown, value: Record<string, unknown>) => [{ type: "text", text: value.renderText }],
+      render: textRender,
     },
     presentCall: () => ({ card: "generic", title: "Diff Workbooks", kind: "read" }),
-    async execute(args: WorkbookDiffRequest, exec: { agent?: { session?: { header?: { cwd?: string } } }; signal?: AbortSignal }) {
+    async execute(args: WorkbookDiffRequest, exec: ToolExec) {
       const result = await new OoxmlSafeEngine(cwdOf(exec)).diff(args, exec.signal);
       return withRenderText(result as Record<string, unknown>, "workbook-diff", args);
     },
@@ -281,10 +294,10 @@ export function apply(ctx: {
     parameters: toJsonSchema(ValidateSchema),
     output: {
       schema: validateOutputSchema,
-      render: (_args: unknown, value: Record<string, unknown>) => [{ type: "text", text: value.renderText }],
+      render: textRender,
     },
     presentCall: () => ({ card: "generic", title: "Validate Workbook", kind: "read" }),
-    async execute(args: WorkbookValidateRequest, exec: { agent?: { session?: { header?: { cwd?: string } } }; signal?: AbortSignal }) {
+    async execute(args: WorkbookValidateRequest, exec: ToolExec) {
       const result = await new OoxmlSafeEngine(cwdOf(exec)).validate(args, exec.signal);
       return withRenderText(result as Record<string, unknown>, "workbook-validate", args);
     },
@@ -314,6 +327,7 @@ export function apply(ctx: {
     skillCtx.skills.register({
       name: "workbook-editor",
       description: skill.description,
+      source: "bundled",
       content: skill.content,
       path: skill.path,
     });

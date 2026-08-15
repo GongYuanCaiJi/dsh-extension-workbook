@@ -32,7 +32,8 @@ test("read returns typed values, formulas, and shared/inline strings", async (t)
   assert.equal(cells.get("C1").formula, "B1*2");
   assert.equal(cells.get("A2").value, true);
   assert.equal(cells.get("B2").value, "Inline text");
-  assert.ok(result.styles.length >= 0);
+  assert.ok(Array.isArray(result.styles), "styles must be reported");
+  assert.equal(result.styles[0].id, 0, "the sheet's used style must be described");
   assert.equal(result.range, "A1:C2");
 });
 

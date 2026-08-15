@@ -90,6 +90,7 @@ test("apply registers the workbook-doctor command and the workbook-editor skill"
   assert.equal(typeof commands[0].handler, "function");
   assert.equal(skills.length, 1);
   assert.equal(skills[0].name, "workbook-editor");
+  assert.equal(skills[0].source, "bundled");
   assert.match(skills[0].description, /^Use when inspecting/);
   assert.match(skills[0].content, /^# Workbook Editor/);
   assert.match(skills[0].content, /expectedSha256/);
@@ -199,4 +200,65 @@ test("bounded output truncation preserves the artifact path in renderText", asyn
   assert.match(value.renderText, /"truncated": true/);
   assert.match(value.renderText, /artifactPath/);
   assert.ok(value.renderText.length <= 200 + 400, "truncated render text must stay small");
+});
+
+// The harness snapshots the canonical value and rejects members that are not
+// lossless JSON (own enumerable properties holding undefined, functions,
+// symbols, bigints, or non-finite numbers all fail the snapshot).
+function assertLosslessJson(value, pathName = "value") {
+  if (value === null || typeof value !== "object") {
+    if (typeof value === "number") assert.ok(Number.isFinite(value), `${pathName} must be a finite number`);
+    assert.ok(["string", "number", "boolean"].includes(typeof value), `${pathName} must be a JSON primitive`);
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => assertLosslessJson(item, `${pathName}[${index}]`));
+    return;
+  }
+  assert.equal(Object.getPrototypeOf(value), Object.prototype, `${pathName} must be a plain object`);
+  for (const key of Object.keys(value)) {
+    const entry = value[key];
+    assert.notEqual(typeof entry, "undefined", `${pathName}.${key} is undefined (not lossless JSON)`);
+    assert.notEqual(typeof entry, "function", `${pathName}.${key} is a function`);
+    assert.notEqual(typeof entry, "bigint", `${pathName}.${key} is a bigint`);
+    assert.notEqual(typeof entry, "symbol", `${pathName}.${key} is a symbol`);
+    assertLosslessJson(entry, `${pathName}.${key}`);
+  }
+}
+
+test("every tool's canonical value is lossless JSON (harness snapshot contract)", async (t) => {
+  const { dir, sourcePath } = await materializeFixture(t);
+  const { tools } = makeCtx(t);
+  const exec = { agent: { session: { header: { cwd: dir } } } };
+  const inspect = tools.find((tool) => tool.name === "workbook_inspect");
+  const read = tools.find((tool) => tool.name === "workbook_read");
+  const render = tools.find((tool) => tool.name === "workbook_render");
+  const edit = tools.find((tool) => tool.name === "workbook_edit");
+  const diff = tools.find((tool) => tool.name === "workbook_diff");
+  const validate = tools.find((tool) => tool.name === "workbook_validate");
+
+  const inspected = await inspect.execute({ path: sourcePath }, exec);
+  assertLosslessJson(inspected, "inspect value");
+  assert.ok(inspected.renderText.length > 0);
+
+  const readValue = await read.execute({ path: sourcePath, sheet: "Sheet1", range: "A1:C2" }, exec);
+  assertLosslessJson(readValue, "read value");
+  // The engine's style descriptors carry explicit undefined attributes; the
+  // normalized value must not (this was the E2E "value is not lossless JSON" bug).
+  assert.equal("name" in readValue.styles[0].font, false, "undefined style attributes must be dropped");
+
+  const renderValue = await render.execute({ path: sourcePath, sheet: "Sheet1", range: "A1:C2" }, exec);
+  assertLosslessJson(renderValue, "render value");
+
+  const dryRun = await edit.execute(
+    { path: sourcePath, dryRun: true, operations: [{ type: "setValue", sheet: "Sheet1", range: "A1", value: "Changed" }] },
+    exec,
+  );
+  assertLosslessJson(dryRun, "edit value");
+
+  const diffValue = await diff.execute({ beforePath: sourcePath, afterPath: sourcePath }, exec);
+  assertLosslessJson(diffValue, "diff value");
+
+  const validateValue = await validate.execute({ path: sourcePath }, exec);
+  assertLosslessJson(validateValue, "validate value");
 });
