@@ -36,14 +36,23 @@
 
 ### 安装
 
+从本地目录安装（需要先自行构建）：
+
 ```bash
 git clone https://github.com/GongYuanCaiJi/dsh-extension-workbook.git
-cd dsh-extension-workbook
-npm install
-dsh plugin --profile <profile> add ./dsh-extension-workbook
+cd dsh-extension-workbook && npm install        # 触发 prepare，产出 dist/
+dsh plugin --profile <profile> add ../dsh-extension-workbook
 ```
 
-本包尚未发布到 npm，请使用本地路径或 `github:` 安装；需要 Node.js 24 或更新版本。安装后重启 dsh 让插件生效。
+或直接通过 GitHub 安装：
+
+```bash
+dsh plugin --profile <profile> add github:GongYuanCaiJi/dsh-extension-workbook
+```
+
+安装时会通过 `prepare` 脚本自动构建 `dist/`。若 pnpm 拦下构建步骤，在 profile 的 `pnpm-workspace.yaml` 里把本包加进 `allowBuilds`。
+
+本包尚未发布到 npm；需要 Node.js 24 或更新版本。安装后重启 dsh 让插件生效。
 
 ### 使用
 
@@ -55,7 +64,11 @@ dsh plugin --profile <profile> add ./dsh-extension-workbook
 
 ### 移植说明
 
-本插件是 [@firstpick/pi-extension-workbook](https://www.npmjs.com/package/@firstpick/pi-extension-workbook)（MIT）的 dsh 移植（port），上游代码按「100% 原样复制、只做必要适配」的规则保留；每一处适配都记录在 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)。上游的文字（skill 与 docs）是英文而本项目受众以中文为主，按原样复制规则**未翻译**，保留原文。如果上游对你有帮助，[也给上游一个 star](https://github.com/Firstp1ck/pi-coding-agent-forge)。更多移植规范见 [deepseek-harness 移植 playbook](https://github.com/GongYuanCaiJi/deepseek-harness/blob/main/docs/port-playbook.md)。
+本插件是 [@firstpick/pi-extension-workbook](https://www.npmjs.com/package/@firstpick/pi-extension-workbook)（MIT）的 dsh 移植（port），上游代码按「100% 原样复制、只做必要适配」的规则保留；每一处适配都记录在 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)。上游的文字（skill 与 docs）是英文而本项目受众以中文为主，按原样复制规则**未翻译**，保留原文。如果上游对你有帮助，[也给上游一个 star](https://github.com/Firstp1ck/pi-coding-agent-forge)。
+
+### License
+
+MIT。上游 [`@firstpick/pi-extension-workbook`](https://www.npmjs.com/package/@firstpick/pi-extension-workbook) `Copyright (c) 2026 Firstpick`，本移植 `Copyright (c) 2026 GongYuanCaiJi`。见 [LICENSE](./LICENSE)。
 
 ---
 
@@ -82,14 +95,23 @@ This is a dsh port of the Pi extension [@firstpick/pi-extension-workbook](https:
 
 ### Install
 
+From a local directory (build first):
+
 ```bash
 git clone https://github.com/GongYuanCaiJi/dsh-extension-workbook.git
-cd dsh-extension-workbook
-npm install
-dsh plugin --profile <profile> add ./dsh-extension-workbook
+cd dsh-extension-workbook && npm install        # runs prepare, produces dist/
+dsh plugin --profile <profile> add ../dsh-extension-workbook
 ```
 
-Not published to npm yet — use the local path or a `github:` install. Requires Node.js 24+. Restart dsh after installing so the plugin loads.
+Or directly from GitHub:
+
+```bash
+dsh plugin --profile <profile> add github:GongYuanCaiJi/dsh-extension-workbook
+```
+
+The `prepare` script builds `dist/` during install. If pnpm blocks the build step, add the package to `allowBuilds` in the profile's `pnpm-workspace.yaml`.
+
+Not published to npm yet; requires Node.js 24+. Restart dsh after installing so the plugin loads.
 
 ### Usage
 
@@ -98,3 +120,7 @@ Attach or reference the `.xlsx` / `.xlsm` file, then describe the result you wan
 > Inspect this workbook, correct the totals in the Summary sheet, preserve the formatting, and show me the validation result.
 
 Start with inspection or rendering, review the proposed cell changes, and keep the edited file only after the final comparison and validation are satisfactory.
+
+### License
+
+MIT. Upstream [`@firstpick/pi-extension-workbook`](https://www.npmjs.com/package/@firstpick/pi-extension-workbook) `Copyright (c) 2026 Firstpick`; this port `Copyright (c) 2026 GongYuanCaiJi`. See [LICENSE](./LICENSE).

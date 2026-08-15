@@ -27,8 +27,10 @@ Verifiable download:
 
 ```bash
 npm pack @firstpick/pi-extension-workbook@0.1.5
-shasum -a 256 pi-extension-workbook-0.1.5.tgz   # == 2a2f92cad262afd143d88083574aaf9b970b715d
+shasum pi-extension-workbook-0.1.5.tgz          # == 2a2f92cad262afd143d88083574aaf9b970b715d
 ```
+
+(npm's registry "shasum" field is SHA-1, so the command is `shasum`, not `shasum -a 256`.)
 
 ## 2. Files copied byte-for-byte from the upstream tarball
 
@@ -87,7 +89,7 @@ shows the full extent.
 | File | Upstream SHA-256 | Change (and why it cannot stay verbatim) |
 |---|---|---|
 | `index.ts` | `2c83c7b3b59f66bc4a58f0d3bf51f9e0037f1eb518be1f49bc8e9b622374ee1f` | **Rewritten as the dsh plugin entry.** Pi extensions are `(pi) => void` factories; dsh plugins export `name`/`inject`/`apply(ctx)` (Cordis namespace contract, no `export default`). Tool registrations become `ctx.tools.register(...)`, the command becomes `commands.register(...)`, and the skill becomes a `skills.register(...)` of the shipped `SKILL.md`. The six tools, their parameters (TypeBox → JSON Schema), the command, and all re-exports are preserved. Two post-review additions, each forced by the harness and found in the E2E: (1) canonical values are normalized to lossless JSON (the harness snapshots tool values and rejects members like the engine's explicit-`undefined` style attributes); (2) the skill registration carries `source: "bundled"` (dsh's skill validation requires a source string). |
-| `README.md` | `d8e2ff46d5de75ddbfe7a2042b0f714020f2cb2802aeae46541e4c4ad8a2f461` | Bilingual rewrite (zh/en) with a language switcher, per the port playbook's presentation conventions; install instructions target dsh instead of Pi. |
+| `README.md` | `62325a98f63413bbf58eced695de2a71e65a9ad773afeb1edc173dc0882b9daf` | Bilingual rewrite (zh/en) with a language switcher, per the port playbook's presentation conventions; install instructions target dsh instead of Pi. |
 | `src/core/hash.ts` | `2b5c75ac9314e6c59be58eae5765ace8990f9932eea98b308ceb01d8c18e6102` | Import reroute: `@firstpick/pi-utils/hash` → `../vendor/pi-utils/hash.ts`. The upstream dependency ships TypeScript sources; Node refuses type-stripping under `node_modules`, so the used modules are vendored (see section 4) and bundled at build time. |
 | `src/core/io.ts` | `149d4ad90e9d568782be98a26066b04e0e68e5fb1d6ad8b9a6a2ec065670c4e3` | Import reroute: `@firstpick/pi-utils/filesystem` → `../vendor/pi-utils/filesystem.ts` (same reason). |
 | `src/core/transaction.ts` | `e66399e67ee5bcb0260dd47af5c75513c8ca0264c1a963a0c58a1600f70a0848` | Import reroute: `@firstpick/pi-utils/paths` → `../vendor/pi-utils/paths.ts` (same reason). |
